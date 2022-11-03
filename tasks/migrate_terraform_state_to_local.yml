@@ -1,0 +1,27 @@
+---
+platform: linux
+
+image_resource:
+  type: registry-image
+  source: {repository: hashicorp/terraform}
+  
+inputs:
+  - name: working-dir
+  - name: concourse
+
+outputs:
+  - name: working-dir
+  
+run:
+  path: /bin/sh
+  args:
+    - -c
+    - |
+      cd working-dir
+      if [[ -f ../concourse/terraform/$S3_BACKEND_TF ]]; then
+        echo "INFO - Pre-existing S3 backend configuration found. Opting to migrate state locally before destroying."
+        cp ../concourse/terraform/$LOCAL_BACKEND_TF ./terraform_backend.tf
+        terraform init -migrate-state -force-copy
+      else
+        echo "INFO - No pre-existing S3 backend found. No requirement to migrate state locally."
+      fi

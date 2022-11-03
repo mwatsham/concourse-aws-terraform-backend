@@ -1,0 +1,37 @@
+---
+platform: linux
+
+image_resource:
+  type: registry-image
+  source: {repository: hashicorp/terraform}
+  
+inputs:
+  - name: working-dir
+  - name: concourse
+
+outputs:
+  - name: concourse
+
+run:
+  path: /bin/sh
+  args:
+    - -c
+    - |
+      cd working-dir
+      
+      if [[ -f ../concourse/terraform/$S3_BACKEND_TF ]]; then
+        echo "INFO - Pre-existing S3 state backend config found. Removing config." 
+        rm -rf ../concourse/terraform/$STATE_PREFIX
+      else
+        echo "INFO - No pre-existing S3 state backend found. No need to remove."
+      fi
+      
+      cd ../concourse
+      git config user.email "<git user email>"
+      git config user.name "<git username>"
+      git add .
+      OUTPUT=$(git commit -m "Updating Terraform backend config" | tail -1)
+      
+      if [[ "$OUTPUT" == *"nothing to commit"* || "$OUTPUT" == *"no changes"* ]]; then
+        echo "INFO - No changes to commit"
+      fi

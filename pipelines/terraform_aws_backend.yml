@@ -1,0 +1,147 @@
+---
+resources:
+  - name: concourse
+    type: git
+    icon: github
+    check_every: never
+    source:
+      uri:  ((REPOSITORY.PIPELINE.URI))
+      branch: ((REPOSITORY.PIPELINE.BRANCH))
+      password: ((REPOSITORY.PIPELINE.GITTOKEN))
+      username: ((REPOSITORY.PIPELINE.GITUSER))
+
+  - name: terraform-state-backend
+    type: git
+    icon: github
+    check_every: never
+    source:
+      uri: ((REPOSITORY.TF_BACKEND.URI)) 
+      branch: ((REPOSITORY.TF_BACKEND.BRANCH))
+      password: ((REPOSITORY.TF_BACKEND.GITTOKEN))
+      username: ((REPOSITORY.TF_BACKEND.GITUSER))
+  
+jobs:
+  - name: deploy-terraform-backend
+    public: false
+    serial: true
+    plan:
+      - in_parallel:
+        - get: concourse
+          trigger: false
+        - get: terraform-state-backend
+          trigger: false
+
+      - task: init-terraform-state-backend
+        file: concourse/tasks/init_terraform_backend.yml
+        params:
+          AWS_ACCESS_KEY_ID: ((BACKEND.DEPLOY_CREDS.ACCESS_KEY))
+          AWS_SECRET_ACCESS_KEY: ((BACKEND.DEPLOY_CREDS.SECRET_KEY))
+          AWS_DEFAULT_REGION: ((BACKEND.REGION))
+          TFVARS_FILE: "((BACKEND.NAME)).auto.tfvars"
+          S3_BACKEND_TF: "((BACKEND.NAME))/terraform_backend.tf"
+          LOCAL_BACKEND_TF: "terraform_backend_local.tf"
+          TF_VAR_aws_region: ((BACKEND.REGION))
+          TF_VAR_aws_region_replica: ((BACKEND.REGION_REPLICA))
+      
+      - task: validate-terraform-state-backend
+        file: concourse/tasks/validate_terraform_backend.yml
+      
+      - task: plan-terraform-state-backend
+        file: concourse/tasks/plan_terraform_backend.yml
+        params:
+          AWS_ACCESS_KEY_ID: ((BACKEND.DEPLOY_CREDS.ACCESS_KEY))
+          AWS_SECRET_ACCESS_KEY: ((BACKEND.DEPLOY_CREDS.SECRET_KEY))
+          AWS_DEFAULT_REGION: ((BACKEND.REGION))
+          TF_VAR_aws_region: ((BACKEND.REGION))
+          TF_VAR_aws_region_replica: ((BACKEND.REGION_REPLICA))
+          TF_VAR_aws_deploy_role: arn:aws:iam::((BACKEND.ACCOUNT)):role/((BACKEND.DEPLOY_CREDS.ROLE))
+          TF_VAR_tags: ((BACKEND.TAGGING))
+      
+      - task: apply-terraform-state-backend
+        file: concourse/tasks/apply_terraform_backend.yml
+        params:
+          AWS_ACCESS_KEY_ID: ((BACKEND.DEPLOY_CREDS.ACCESS_KEY))
+          AWS_SECRET_ACCESS_KEY: ((BACKEND.DEPLOY_CREDS.SECRET_KEY))
+          AWS_DEFAULT_REGION: ((BACKEND.REGION))
+          
+      - task: migrate-terraform-state-backend
+        file: concourse/tasks/migrate_terraform_state_to_remote.yml
+        params:
+          AWS_ACCESS_KEY_ID: ((BACKEND.DEPLOY_CREDS.ACCESS_KEY))
+          AWS_SECRET_ACCESS_KEY: ((BACKEND.DEPLOY_CREDS.SECRET_KEY))
+          AWS_DEFAULT_REGION: ((BACKEND.REGION))
+          S3_BACKEND_TF: "((BACKEND.NAME))/terraform_backend.tf"
+          
+      - task: outputs-terraform-state-backend
+        file: concourse/tasks/outputs_terraform_backend.yml
+        params:
+          STATE_PREFIX: "((BACKEND.NAME))"
+          S3_BACKEND_TF: "((BACKEND.NAME))/terraform_backend.tf"
+          PIPELINE: "((PIPELINE.NAME))-((BACKEND.NAME))"
+        
+      - put: concourse
+        params:
+          repository: concourse
+      
+  - name: destroy-terraform-backend
+    public: false
+    serial: true
+    plan:
+      - in_parallel:
+        - get: concourse
+          trigger: false
+        - get: terraform-state-backend
+          trigger: false
+          
+      - task: init-terraform-state-backend
+        file: concourse/tasks/init_terraform_backend.yml
+        params:
+          AWS_ACCESS_KEY_ID: ((BACKEND.DEPLOY_CREDS.ACCESS_KEY))
+          AWS_SECRET_ACCESS_KEY: ((BACKEND.DEPLOY_CREDS.SECRET_KEY))
+          AWS_DEFAULT_REGION: ((BACKEND.REGION))
+          TFVARS_FILE: "((BACKEND.NAME)).auto.tfvars"
+          S3_BACKEND_TF: "((BACKEND.NAME))/terraform_backend.tf"
+          LOCAL_BACKEND_TF: "terraform_backend_local.tf"
+          TF_VAR_aws_region: ((BACKEND.REGION))
+          TF_VAR_aws_region_replica: ((BACKEND.REGION_REPLICA))
+          
+      - task: migrate-terraform-state-backend
+        file: concourse/tasks/migrate_terraform_state_to_local.yml
+        params:
+          AWS_ACCESS_KEY_ID: ((BACKEND.DEPLOY_CREDS.ACCESS_KEY))
+          AWS_SECRET_ACCESS_KEY: ((BACKEND.DEPLOY_CREDS.SECRET_KEY))
+          AWS_DEFAULT_REGION: ((BACKEND.REGION))
+          S3_BACKEND_TF: "((BACKEND.NAME))/terraform_backend.tf"
+          LOCAL_BACKEND_TF: "terraform_backend_local.tf"
+      
+      - task: validate-terraform-state-backend
+        file: concourse/tasks/validate_terraform_backend.yml
+      
+      - task: plan-destroy-terraform-state-backend
+        file: concourse/tasks/plan_destroy_terraform_backend.yml
+        params:
+          AWS_ACCESS_KEY_ID: ((BACKEND.DEPLOY_CREDS.ACCESS_KEY))
+          AWS_SECRET_ACCESS_KEY: ((BACKEND.DEPLOY_CREDS.SECRET_KEY))
+          AWS_DEFAULT_REGION: ((BACKEND.REGION))
+          TF_VAR_aws_region: ((BACKEND.REGION))
+          TF_VAR_aws_region_replica: ((BACKEND.REGION_REPLICA))
+          TF_VAR_aws_deploy_role: arn:aws:iam::((BACKEND.ACCOUNT)):role/((BACKEND.DEPLOY_CREDS.ROLE))
+          TF_VAR_tags: ((BACKEND.TAGGING))
+      
+      - task: apply-destroy-terraform-state-backend
+        file: concourse/tasks/apply_destroy_terraform_backend.yml
+        params:
+          AWS_ACCESS_KEY_ID: ((BACKEND.DEPLOY_CREDS.ACCESS_KEY))
+          AWS_SECRET_ACCESS_KEY: ((BACKEND.DEPLOY_CREDS.SECRET_KEY))
+          AWS_DEFAULT_REGION: ((BACKEND.REGION))
+      
+      - task: outputs-terraform-state-backend
+        file: concourse/tasks/outputs_remove_terraform_backend.yml
+        params:
+          STATE_PREFIX: "((BACKEND.NAME))"
+          S3_BACKEND_TF: "((BACKEND.NAME))/terraform_backend.tf"
+          PIPELINE: "((PIPELINE.NAME))-((BACKEND.NAME))"
+
+      - put: concourse
+        params:
+          repository: concourse

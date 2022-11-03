@@ -1,0 +1,18 @@
+# DUMMY
+- NAME: "dummy"
+  ACCOUNT: "123456789012"
+  REGION: "eu-west-2"
+  REGION_REPLICA: "eu-west-1"
+  TAGGING:
+    billing_team: "local-finance"
+    cost_centre: "1234567890"
+    contact: "support-team@example.com"
+    deployed_by: "terraform"
+    workflow: "dev"
+    region: "eu-west-2"
+    territory: "uk"
+  DEPLOY_CREDS:
+    USER: "concourse-deploy-user"
+    ROLE: "concourse-deploy-role"
+    ACCESS_KEY: ((concourse-deploy-user-key))
+    SECRET_KEY: ((concourse-deploy-user-secret))

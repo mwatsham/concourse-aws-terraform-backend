@@ -1,0 +1,31 @@
+---
+platform: linux
+
+image_resource:
+  type: registry-image
+  source: {repository: hashicorp/terraform}
+  
+inputs:
+  - name: terraform-state-backend
+  - name: concourse
+
+outputs:
+  - name: working-dir
+  
+run:
+  path: /bin/sh
+  args:
+    - -c
+    - |
+      cd working-dir
+      terraform init -from-module=../terraform-state-backend
+      cp ../concourse/config/tfvars/$TFVARS_FILE .
+      cp ../concourse/terraform/main_aws_terraform_backend.tf .
+      if [[ -f ../concourse/terraform/$S3_BACKEND_TF ]]; then
+        echo "INFO - Using pre-existing S3 backend configuration."
+        cp ../concourse/terraform/$S3_BACKEND_TF ./terraform_backend.tf
+      else
+        echo "INFO - No pre-exisiting S3 backend config. Using local backend configuration."
+        cp ../concourse/terraform/$LOCAL_BACKEND_TF ./terraform_backend.tf
+      fi
+      terraform init

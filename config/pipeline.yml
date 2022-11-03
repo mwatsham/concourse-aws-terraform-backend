@@ -1,0 +1,3 @@
+PIPELINE:
+  NAME: "my-tf-state-backend-deployment"
+  TEAM: "myteam"

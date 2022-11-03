@@ -1,0 +1,39 @@
+---
+platform: linux
+
+image_resource:
+  type: registry-image
+  source: {repository: hashicorp/terraform}
+  
+inputs:
+  - name: working-dir
+  - name: concourse
+
+outputs:
+  - name: concourse
+
+run:
+  path: /bin/sh
+  args:
+    - -c
+    - |
+      cd working-dir
+      cat s3_backend_tfconfig
+      if [[ -f ../concourse/terraform/$S3_BACKEND_TF ]]; then
+        cp s3_backend_tfconfig ../concourse/terraform/$S3_BACKEND_TF
+      else
+        mkdir ../concourse/terraform/$STATE_PREFIX
+        cp s3_backend_tfconfig ../concourse/terraform/$S3_BACKEND_TF
+      fi
+      
+      cd ../concourse
+      git config user.email "<git user email>"
+      git config user.name "<git username>"
+      git add .
+      OUTPUT=$(git commit -m "Updating Terraform backend config" | tail -1)
+      
+      if [[ "$OUTPUT" == *"nothing to commit"* || "$OUTPUT" == *"no changes"* ]]; then
+        echo "INFO - No changes to commit"
+      fi
+      
+      

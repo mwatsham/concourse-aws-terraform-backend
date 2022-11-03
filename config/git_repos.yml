@@ -1,0 +1,11 @@
+REPOSITORY:
+  PIPELINE:
+    URI: https://github.com/mwatsham/concourse-aws-terraform-backend.git
+    BRANCH: main
+    GITUSER: ((watshamm/gituser))
+    GITTOKEN: ((watshamm/gittoken))
+  TF_BACKEND:
+    URI: https://github.com/mwatsham/terraform-aws-backend.git
+    BRANCH: main
+    GITUSER: ((watshamm/gituser))
+    GITTOKEN: ((watshamm/gittoken))

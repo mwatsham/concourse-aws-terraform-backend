@@ -1,0 +1,43 @@
+---
+resources:
+  - name: concourse
+    type: git
+    icon: github
+    check_every: 1m
+    source:
+      uri:  ((REPOSITORY.PIPELINE.URI))
+      branch: ((REPOSITORY.PIPELINE.BRANCH))
+      password: ((REPOSITORY.PIPELINE.GITTOKEN))
+      username: ((REPOSITORY.PIPELINE.GITUSER))
+
+jobs:
+  - name: set-self
+    public: false
+    plan:
+    - get: concourse
+      trigger: true
+    - set_pipeline: self
+      file: concourse/pipelines/factory.yml
+      var_files: [ concourse/config/pipeline.yml, concourse/config/git_repos.yml ]
+      instance_vars:
+        TITLE: "Pipeline Factory"
+      
+  - name: pipe-factory
+    public: false
+    plan:
+    - get: concourse
+      trigger: true
+      passed: [ set-self ]
+    - load_var: backends
+      file: concourse/config/terraform_backends.yml
+
+    - across:
+      - var: backend
+        values: ((.:backends))
+      set_pipeline: ((PIPELINE.NAME))
+      file: concourse/pipelines/terraform_aws_backend.yml
+      var_files: [ concourse/config/pipeline.yml, concourse/config/git_repos.yml ]
+      vars:
+        BACKEND: ((.:backend))
+      instance_vars:
+        BACKEND: ((.:backend.NAME))
